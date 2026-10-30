@@ -7,8 +7,10 @@
   <!-- Ícono de la pantalla de inicio del iPhone: Apps Script no deja cambiar el suyo, por eso existe esta página. -->
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="icon" type="image/png" href="favicon-32.png">
-  <link rel="manifest" href="manifest.webmanifest">
   <meta name="apple-mobile-web-app-title" content="Luddy">
+  <!-- Abierta desde el ícono del inicio corre como app (standalone): ahí sí salta directo a Luddy. -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#f4efeb">
   <style>
     :root { --rosa: #b5456a; --fondo: #f4efeb; --texto: #3a2a22; --suave: #6b5649; }
@@ -20,7 +22,7 @@
     h1 { font-size: 22px; margin: 18px 0 6px; }
     p { color: var(--suave); margin: 6px 0; }
     input { width: 100%; font: inherit; font-size: 16px; padding: 12px; border: 1px solid #e2d6cc; border-radius: 10px; margin: 14px 0 10px; }
-    button { width: 100%; border: 0; border-radius: 12px; background: var(--rosa); color: #fff; font: inherit; font-weight: 600; font-size: 17px; padding: 14px; }
+    button, .btn { display: block; box-sizing: border-box; text-decoration: none; text-align: center; width: 100%; border: 0; border-radius: 12px; background: var(--rosa); color: #fff; font: inherit; font-weight: 600; font-size: 17px; padding: 14px; }
     ol { text-align: left; color: var(--texto); padding-left: 22px; }
     .err { color: #c0392b; }
     [hidden] { display: none; }
@@ -29,9 +31,18 @@
 <body>
   <main>
     <img src="icon-512.png" alt="Luddy pastelería">
-    <div id="abriendo">
+    <div id="abriendo" hidden>
       <h1>Abriendo Luddy…</h1>
-      <p>Si no se abre sola, <a id="link" href="#">tocá acá</a>.</p>
+      <p>Si no se abre sola, <a class="abrir" href="#">tocá acá</a>.</p>
+    </div>
+    <div id="instalar" hidden>
+      <h1>Agregá Luddy a tu inicio</h1>
+      <ol>
+        <li>Tocá <b>Compartir</b> (el cuadrado con la flecha, abajo).</li>
+        <li>Elegí <b>Agregar a inicio</b> y después <b>Agregar</b>.</li>
+        <li>Abrí Luddy desde el ícono nuevo. La primera vez puede pedirte entrar con tu cuenta de Google.</li>
+      </ol>
+      <a class="btn abrir" href="#">Abrir Luddy ahora</a>
     </div>
     <div id="config" hidden>
       <h1>Configurar el acceso</h1>
@@ -39,34 +50,35 @@
       <input id="url" type="url" inputmode="url" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec">
       <p id="error" class="err" hidden>Ese link no parece el de la app. Tiene que terminar en /exec.</p>
       <button id="listo">Listo</button>
-      <div id="pasos" hidden>
-        <h1>¡Listo! Ahora agregala al inicio</h1>
-        <ol>
-          <li>Tocá <b>Compartir</b> (el cuadrado con la flecha).</li>
-          <li>Elegí <b>Agregar a inicio</b> y después <b>Agregar</b>.</li>
-          <li>Abrí Luddy desde el ícono nuevo.</li>
-        </ol>
-      </div>
     </div>
   </main>
   <script>
     // El ID de la app viaja en el link (después del #), no en este repositorio: así no queda nada privado publicado.
+    // En Safari NO salta sola (si saltara, "Agregar a inicio" tomaría el ícono de Google); desde el ícono, sí.
     var ID = /^[A-Za-z0-9_-]{20,}$/;
+    var $ = function (x) { return document.getElementById(x); };
     var destino = function (id) { return 'https://script.google.com/macros/s/' + id + '/exec'; };
-    var id = decodeURIComponent(location.hash.slice(1));
-    if (ID.test(id)) {
-      document.getElementById('link').href = destino(id);
-      location.replace(destino(id));
-    } else {
-      document.getElementById('abriendo').hidden = true;
-      document.getElementById('config').hidden = false;
-      document.getElementById('listo').onclick = function () {
-        var m = document.getElementById('url').value.trim().match(/\/macros\/s\/([A-Za-z0-9_-]{20,})\/exec/);
-        document.getElementById('error').hidden = !!m;
+    var comoApp = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+    var guardado = function () { try { return localStorage.getItem('luddy-id') || ''; } catch (e) { return ''; } };
+    var id = decodeURIComponent(location.hash.slice(1)) || guardado();
+
+    function listo(id) {
+      try { localStorage.setItem('luddy-id', id); } catch (e) {}
+      if (location.hash.slice(1) !== id) history.replaceState(null, '', '#' + id); // el link a guardar lleva el ID
+      [].forEach.call(document.querySelectorAll('.abrir'), function (a) { a.href = destino(id); });
+      if (comoApp) { $('abriendo').hidden = false; location.replace(destino(id)); }
+      else $('instalar').hidden = false;
+    }
+
+    if (ID.test(id)) listo(id);
+    else {
+      $('config').hidden = false;
+      $('listo').onclick = function () {
+        var m = $('url').value.trim().match(/\/macros\/s\/([A-Za-z0-9_-]{20,})\/exec/);
+        $('error').hidden = !!m;
         if (!m) return;
-        history.replaceState(null, '', '#' + m[1]); // el link a guardar en el inicio ya lleva el ID
-        document.getElementById('pasos').hidden = false;
-        this.hidden = true;
+        $('config').hidden = true;
+        listo(m[1]);
       };
     }
   </script>
